@@ -1,0 +1,53 @@
+CrabMeat -- VM cold-install setup
+====================================
+
+Prerequisites
+-------------
+1. Node.js 22 LTS (https://nodejs.org/)
+   * Node 24 is also supported but may need build tools for better-sqlite3.
+   * Verify after install: open cmd, run `node --version`. Should print v22.x or v24.x.
+
+2. Internet connection during install (npm fetches dependencies, including
+   ~300 MB of Playwright browser binaries on first install).
+
+Setup steps
+-----------
+1. Extract this zip somewhere on a real drive (e.g. C:\crabmeat).
+   Avoid network shares, OneDrive sync folders, and paths with non-ASCII chars.
+
+2. RIGHT-CLICK install.bat and start.bat -> Properties -> tick "Unblock" -> OK.
+   (Windows marks scripts from downloaded zips as untrusted and may kill them
+   silently. The Unblock checkbox only appears if the file is blocked.)
+
+3. Double-click install.bat. It will:
+   - check Node is on PATH
+   - run `npm install` (1-3 min plus Playwright)
+   - leave the window open at the end -- press a key to close.
+
+4. Double-click start.bat. It will spawn two cmd windows:
+   - "CrabMeat Gateway" -- the server on 127.0.0.1:3000
+   - "CrabMeat Chat"    -- the interactive chat client
+   Close either window to stop that piece.
+
+If a .bat window flashes and disappears
+---------------------------------------
+Open cmd.exe first, cd into the crabmeat folder, and run `install.bat` from
+inside that cmd window. That keeps the window open so you can see the actual
+error.
+
+Provider
+--------
+Default provider is DeepSeek via OpenAI-compatible endpoint. API key lives
+in .env (DEEPSEEK_API_KEY). Anthropic and OpenAI keys are also in .env for
+cascade failover testing. No Ollama needed -- local providers are optional.
+
+Files
+-----
+- install.bat       : one-time dependency install
+- start.bat         : launch gateway + chat
+- requirements.txt  : this file
+- .env              : API keys + tokens (do not commit)
+- crabmeat.json     : provider, tool, agent config
+- package.json      : Node dependency manifest (the real "requirements")
+- src/              : TypeScript source
+- vendor/arbiter/   : vendored dependency (already pre-built)

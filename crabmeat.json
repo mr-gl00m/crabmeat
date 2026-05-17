@@ -1,0 +1,117 @@
+{
+  "_comment": "Sanitized starter config. Copy to crabmeat.json and edit. Secrets (gateway.auth.token, admin.token) are injected from .env at load time — leave them out of this file.",
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 3000,
+    "auth": {
+      "mode": "token"
+    },
+    "origins": [
+      "http://localhost:*"
+    ]
+  },
+  "_providers_note": "Default ships an Anthropic stub — set ANTHROPIC_API_KEY in .env. To use OpenAI, swap type to 'openai' and the env-var ref to $SECRET:OPENAI_API_KEY (model e.g. 'gpt-4o-mini'). To use a local Ollama, replace this block with the example in 'providers (local Ollama)' below and set allowLocalProviders=true (it already is).",
+  "providers": [
+    {
+      "id": "ollama-local",
+      "type": "ollama",
+      "apiKey": "ollama",
+      "baseUrl": "http://localhost:11434",
+      "model": "gpt-oss:20b",
+      "timeoutMs": 180000,
+      "providerOptions": { "options": { "num_ctx": 16384 } }
+    }
+  ],
+  "_providers_local_ollama_alternate": [
+    {
+      "id": "ollama-local",
+      "type": "ollama",
+      "apiKey": "ollama",
+      "baseUrl": "http://localhost:11434",
+      "model": "gpt-oss:latest",
+      "timeoutMs": 180000,
+      "providerOptions": { "options": { "num_ctx": 16384 } }
+    }
+  ],
+  "tools": [
+    {
+      "id": "file_read",
+      "name": "file_read",
+      "description": "Read the contents of a file.",
+      "effectClass": "read",
+      "parameters": {
+        "path": {
+          "type": "string",
+          "description": "Path to the file",
+          "required": true
+        }
+      }
+    },
+    {
+      "id": "shell",
+      "name": "shell",
+      "description": "Run a shell command.",
+      "effectClass": "exec",
+      "parameters": {
+        "command": {
+          "type": "string",
+          "description": "Command to run",
+          "required": true
+        },
+        "cwd": {
+          "type": "string",
+          "description": "Optional working directory; must be inside the workspace or an allowed file access root.",
+          "required": false
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Preview the command without running it.",
+          "required": false,
+          "default": false
+        }
+      }
+    }
+  ],
+  "agents": [
+    {
+      "id": "default",
+      "name": "CrabMeat Agent",
+      "systemPrompt": "You are a capable AI agent running through CrabMeat. Use the available tools to investigate, plan, and execute tasks. Prefer read-only tools for exploration; use plan_mode before write/exec actions on non-trivial work.",
+      "temperature": 0.7,
+      "maxTokens": 4096,
+      "tools": [
+        "file_read",
+        "shell"
+      ],
+      "allowedEffects": [
+        "read",
+        "exec"
+      ],
+      "maxToolIterations": 15
+    }
+  ],
+  "session": {
+    "backend": "json",
+    "dir": ".crabmeat/sessions"
+  },
+  "admin": {
+    "enabled": false
+  },
+  "allowLocalProviders": true,
+  "fileAccessPresets": [
+    "downloads",
+    "documents",
+    "desktop"
+  ],
+  "fileAccessPaths": [],
+  "_fileAccess_note": "fileAccessPresets safely grants common user folders under your home directory. fileAccessPaths is for additional explicit absolute roots only, e.g. [\"C:/Users/me/Projects\", \"D:/Media/Inbox\"]. Do not use drive roots, home itself, or relative paths; the schema rejects them.",
+  "_emailImap_note": "Inbound+outbound email connector. Credentials must NOT live here — put them in .crabmeat/local.json (gitignored), which deep-merges over this file at boot. Schema: connectors.emailImap = { user, password (Gmail App Password), from?, allowFromAddresses[] (required), outboundTo? (defaults to allowFromAddresses), imapHost?, imapPort?, smtpHost?, smtpPort?, pollIntervalMs?, mailbox? }. See README 'Email Agent' for the cold-start walk-through.",
+  "_refusalFallback_note": "Interception layer: when the primary model refuses, CrabMeat silently reroutes to a fallback local provider. Two modes: (1) strict — only reroute requests whose content class is on contentClassAllowlist (nsfw-search, adult-creative, edgy-humor, security-research, substance-info); (2) rerouteUnclassified=true — also reroute when the classifier couldn't identify a class (the 'no babysitter' mode — catches small local models refusing benign queries). Disabled by default.",
+  "refusalFallback": {
+    "enabled": false,
+    "fallbackProviderIds": [],
+    "contentClassAllowlist": [],
+    "leadBytes": 200,
+    "rerouteUnclassified": false
+  }
+}

@@ -1,0 +1,308 @@
+{
+  "_comment": "Sanitized starter config. Copy to crabmeat.json and edit. Secrets (gateway.auth.token, admin.token) are injected from .env at load time — leave them out of this file.",
+
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 3000,
+    "auth": {
+      "mode": "token"
+    },
+    "origins": ["http://localhost:*"]
+  },
+
+  "_providers_note": "Default ships an Anthropic stub — set ANTHROPIC_API_KEY in .env. To use OpenAI, swap type to 'openai' and the env-var ref to $SECRET:OPENAI_API_KEY (model e.g. 'gpt-4o-mini'). To use a local Ollama, replace this block with the example in 'providers (local Ollama)' below and set allowLocalProviders=true (it already is).",
+  "providers": [
+    {
+      "id": "anthropic",
+      "type": "anthropic",
+      "apiKey": "$SECRET:ANTHROPIC_API_KEY",
+      "model": "claude-haiku-4-5-20251001",
+      "timeoutMs": 180000
+    }
+  ],
+
+  "_providers_local_ollama_alternate": [
+    {
+      "id": "ollama-local",
+      "type": "ollama",
+      "apiKey": "ollama",
+      "baseUrl": "http://127.0.0.1:11434",
+      "model": "qwen3",
+      "timeoutMs": 180000,
+      "providerOptions": { "options": { "num_ctx": 16384 } }
+    }
+  ],
+
+  "_tools_note": "The agent can only call tools listed here AND in the agent's 'tools' array. This catalog mirrors CrabMeat's built-in tool handlers; trim it if you want a narrower agent.",
+  "tools": [
+    {
+      "id": "file_read",
+      "name": "file_read",
+      "description": "Read a UTF-8 text file inside the workspace, optionally a line range.",
+      "effectClass": "read",
+      "parameters": {
+        "path": { "type": "string", "description": "Path to the file to read, inside the workspace.", "required": true },
+        "offset": { "type": "number", "description": "1-based line number to start reading from.", "required": false, "default": 1 },
+        "limit": { "type": "number", "description": "Maximum number of lines to return.", "required": false, "default": 300 }
+      }
+    },
+    {
+      "id": "file_write",
+      "name": "file_write",
+      "description": "Atomically create or overwrite a text file inside the workspace.",
+      "effectClass": "write",
+      "parameters": {
+        "path": { "type": "string", "description": "Path to the file to write, inside the workspace.", "required": true },
+        "content": { "type": "string", "description": "UTF-8 text content to write.", "required": true },
+        "overwrite": { "type": "boolean", "description": "Must be true to replace an existing file.", "required": false, "default": false },
+        "dry_run": { "type": "boolean", "description": "Preview the write without touching disk.", "required": false, "default": false }
+      }
+    },
+    {
+      "id": "file_edit",
+      "name": "file_edit",
+      "description": "Replace an exact string in an existing workspace text file.",
+      "effectClass": "write",
+      "parameters": {
+        "path": { "type": "string", "description": "Path to the existing file to edit.", "required": true },
+        "old_string": { "type": "string", "description": "Exact text to find; must be non-empty and present in the file.", "required": true },
+        "new_string": { "type": "string", "description": "Replacement text; must differ from old_string.", "required": true },
+        "replace_all": { "type": "boolean", "description": "Replace every occurrence instead of requiring a single unique match.", "required": false, "default": false }
+      }
+    },
+    {
+      "id": "file_list",
+      "name": "file_list",
+      "description": "List directory entries (name, type, size) for a workspace directory.",
+      "effectClass": "read",
+      "parameters": {
+        "path": { "type": "string", "description": "Directory path to list, inside the workspace.", "required": false, "default": "." }
+      }
+    },
+    {
+      "id": "file_move",
+      "name": "file_move",
+      "description": "Move one or more files to a destination inside the workspace.",
+      "effectClass": "write",
+      "parameters": {
+        "source": { "type": "string", "description": "Single source file path; use this or 'sources'.", "required": false },
+        "sources": { "type": "array", "description": "Array of source file paths; use this or 'source'.", "required": false },
+        "destination": { "type": "string", "description": "Destination file or directory path.", "required": true },
+        "dry_run": { "type": "boolean", "description": "Preview the move plan; returns a confirm_token.", "required": false, "default": false },
+        "confirm_token": { "type": "string", "description": "Token from a prior preview, required to execute bulk moves.", "required": false }
+      }
+    },
+    {
+      "id": "file_copy",
+      "name": "file_copy",
+      "description": "Copy one or more files to a destination inside the workspace.",
+      "effectClass": "write",
+      "parameters": {
+        "source": { "type": "string", "description": "Single source file path; use this or 'sources'.", "required": false },
+        "sources": { "type": "array", "description": "Array of source file paths; use this or 'source'.", "required": false },
+        "destination": { "type": "string", "description": "Destination file or directory path.", "required": true },
+        "dry_run": { "type": "boolean", "description": "Preview the copy plan; returns a confirm_token.", "required": false, "default": false },
+        "confirm_token": { "type": "string", "description": "Token from a prior preview, required to execute bulk copies.", "required": false }
+      }
+    },
+    {
+      "id": "glob_search",
+      "name": "glob_search",
+      "description": "Find files by glob pattern (*, **, ?, {a,b}) under a workspace directory.",
+      "effectClass": "read",
+      "parameters": {
+        "pattern": { "type": "string", "description": "Glob pattern to match file paths against.", "required": true },
+        "path": { "type": "string", "description": "Base directory to search from.", "required": false, "default": "." }
+      }
+    },
+    {
+      "id": "grep_search",
+      "name": "grep_search",
+      "description": "Search file contents by regular expression under a workspace path.",
+      "effectClass": "read",
+      "parameters": {
+        "pattern": { "type": "string", "description": "JavaScript regular expression to match against each line.", "required": true },
+        "path": { "type": "string", "description": "File or directory to search.", "required": false, "default": "." },
+        "glob": { "type": "string", "description": "Glob filter limiting which files are scanned.", "required": false },
+        "ignore_case": { "type": "boolean", "description": "Case-insensitive matching.", "required": false, "default": false },
+        "files_only": { "type": "boolean", "description": "Return only matching file paths instead of lines.", "required": false, "default": false },
+        "max_results": { "type": "number", "description": "Maximum matches to return.", "required": false, "default": 200 }
+      }
+    },
+    {
+      "id": "web_search",
+      "name": "web_search",
+      "description": "Search the web (Tavily/Brave/DuckDuckGo, auto-selected by configured keys).",
+      "effectClass": "network",
+      "parameters": {
+        "query": { "type": "string", "description": "Search query text.", "required": true },
+        "count": { "type": "number", "description": "Number of results to return (1-10).", "required": false, "default": 5 },
+        "topic": { "type": "string", "description": "Search vertical: 'general' or 'news'.", "required": false },
+        "days": { "type": "number", "description": "Recency window in days for news searches (1-30).", "required": false, "default": 3 },
+        "provider": { "type": "string", "description": "Force a provider: 'tavily', 'brave', or 'duckduckgo'.", "required": false }
+      }
+    },
+    {
+      "id": "web_fetch",
+      "name": "web_fetch",
+      "description": "Fetch a public HTTP/HTTPS URL and return its text content.",
+      "effectClass": "network",
+      "parameters": {
+        "url": { "type": "string", "description": "Public HTTP/HTTPS URL to fetch.", "required": true },
+        "maxLength": { "type": "number", "description": "Maximum characters of body text to return.", "required": false, "default": 50000 }
+      }
+    },
+    {
+      "id": "weather",
+      "name": "weather",
+      "description": "Look up a weather report for a location.",
+      "effectClass": "network",
+      "parameters": {
+        "location": { "type": "string", "description": "City name, airport code, or 'lat,lon'.", "required": true },
+        "format": { "type": "string", "description": "Report format string.", "required": false, "default": "3" }
+      }
+    },
+    {
+      "id": "pdf_extract",
+      "name": "pdf_extract",
+      "description": "Extract and normalize text from a .pdf file inside the workspace.",
+      "effectClass": "read",
+      "parameters": {
+        "path": { "type": "string", "description": "Path to the .pdf file, inside the workspace.", "required": true },
+        "normalize": { "type": "boolean", "description": "Apply text normalization (whitespace, hyphens, headers).", "required": false, "default": true },
+        "max_pages": { "type": "number", "description": "Maximum pages to read.", "required": false, "default": 2000 },
+        "max_chars": { "type": "number", "description": "Maximum characters of extracted text to return.", "required": false, "default": 1000000 }
+      }
+    },
+    {
+      "id": "timer",
+      "name": "timer",
+      "description": "Per-session stopwatch. Start, check, stop, or list named timers.",
+      "effectClass": "read",
+      "parameters": {
+        "action": { "type": "string", "description": "Operation: 'start', 'check', 'stop', or 'list'.", "required": true },
+        "label": { "type": "string", "description": "Timer name.", "required": false, "default": "default" }
+      }
+    },
+    {
+      "id": "random",
+      "name": "random",
+      "description": "Generate random values: integer, float, uuid, choice, or dice.",
+      "effectClass": "read",
+      "parameters": {
+        "mode": { "type": "string", "description": "Mode: 'integer', 'float', 'uuid', 'choice', or 'dice'.", "required": false, "default": "integer" },
+        "min": { "type": "number", "description": "Lower bound for integer mode (inclusive).", "required": false, "default": 1 },
+        "max": { "type": "number", "description": "Upper bound for integer mode (inclusive).", "required": false, "default": 10 },
+        "options": { "type": "array", "description": "Items to pick from in choice mode.", "required": false },
+        "count": { "type": "number", "description": "Number of dice to roll in dice mode.", "required": false, "default": 1 },
+        "sides": { "type": "number", "description": "Number of sides per die in dice mode.", "required": false, "default": 6 }
+      }
+    },
+    {
+      "id": "memory_read",
+      "name": "memory_read",
+      "description": "Read a saved memory note by key, or list all keys when no key is given.",
+      "effectClass": "read",
+      "parameters": {
+        "key": { "type": "string", "description": "Memory key to read; omit to list all keys.", "required": false }
+      }
+    },
+    {
+      "id": "memory_write",
+      "name": "memory_write",
+      "description": "Persist a memory note to disk under a key.",
+      "effectClass": "write",
+      "parameters": {
+        "key": { "type": "string", "description": "Memory key (letters, numbers, dashes, underscores, dots).", "required": true },
+        "content": { "type": "string", "description": "Text content to store.", "required": true },
+        "mode": { "type": "string", "description": "Write mode: 'append' or 'overwrite'.", "required": false, "default": "append" }
+      }
+    },
+    {
+      "id": "todo_write",
+      "name": "todo_write",
+      "description": "In-session planning scratchpad: list, set, update, or clear the todo list.",
+      "effectClass": "read",
+      "parameters": {
+        "action": { "type": "string", "description": "Operation: 'list', 'set', 'update', or 'clear'.", "required": true },
+        "todos": { "type": "array", "description": "For 'set': replacement list of todo items.", "required": false },
+        "id": { "type": "string", "description": "For 'update': id of the todo item to modify.", "required": false },
+        "status": { "type": "string", "description": "For 'update': 'pending', 'in_progress', or 'completed'.", "required": false },
+        "text": { "type": "string", "description": "For 'update': new text for the todo item.", "required": false }
+      }
+    },
+    {
+      "id": "ask_user",
+      "name": "ask_user",
+      "description": "Pause and ask the user a question mid-task, then wait for the reply.",
+      "effectClass": "read",
+      "parameters": {
+        "question": { "type": "string", "description": "Question to put to the user.", "required": true },
+        "options": { "type": "array", "description": "Up to 8 option strings for a multiple-choice prompt.", "required": false },
+        "allow_freeform": { "type": "boolean", "description": "Whether the user may answer with free text.", "required": false, "default": true },
+        "timeout_ms": { "type": "number", "description": "How long to wait for a reply, in milliseconds.", "required": false, "default": 60000 }
+      }
+    },
+    {
+      "id": "plan_mode",
+      "name": "plan_mode",
+      "description": "Planning checkpoint: enter read-only plan mode, exit with a structured plan, or query status.",
+      "effectClass": "read",
+      "parameters": {
+        "action": { "type": "string", "description": "Operation: 'enter', 'exit', or 'status'.", "required": true },
+        "plan": { "type": "object", "description": "For 'exit': structured plan with goal, steps, and confidence.", "required": false }
+      }
+    },
+    {
+      "id": "shell",
+      "name": "shell",
+      "description": "Run a shell command on the host with an allowlisted environment.",
+      "effectClass": "exec",
+      "parameters": {
+        "command": { "type": "string", "description": "Shell command line to execute.", "required": true },
+        "cwd": { "type": "string", "description": "Working directory; must be inside the workspace or an allowed access root.", "required": false },
+        "timeout": { "type": "number", "description": "Command timeout in milliseconds.", "required": false, "default": 120000 },
+        "dry_run": { "type": "boolean", "description": "Report what would run without executing.", "required": false, "default": false }
+      }
+    }
+  ],
+
+  "agents": [
+    {
+      "id": "default",
+      "name": "CrabMeat Agent",
+      "systemPrompt": "You are a capable AI agent running through CrabMeat. Use the tools available to you to investigate, plan, and execute tasks. For file work, prefer the dedicated file and search tools over running shell commands — they are faster, cross-platform, and avoid quoting pitfalls. Explore with read-only tools first, and plan before write or exec actions on non-trivial work.",
+      "temperature": 0.7,
+      "maxTokens": 4096,
+      "tools": ["file_read", "file_write", "file_edit", "file_list", "file_move", "file_copy", "glob_search", "grep_search", "web_search", "web_fetch", "weather", "pdf_extract", "timer", "random", "memory_read", "memory_write", "todo_write", "ask_user", "plan_mode", "shell"],
+      "allowedEffects": ["read", "write", "network", "exec"],
+      "maxToolIterations": 20
+    }
+  ],
+
+  "session": {
+    "backend": "json",
+    "dir": ".crabmeat/sessions"
+  },
+
+  "admin": {
+    "enabled": false
+  },
+
+  "allowLocalProviders": true,
+
+  "fileAccessPresets": ["downloads", "documents", "desktop"],
+  "fileAccessPaths": [],
+  "_fileAccess_note": "fileAccessPresets safely grants common user folders under your home directory. fileAccessPaths is for additional explicit absolute roots only, e.g. [\"C:/Users/me/Projects\", \"D:/Media/Inbox\"]. Do not use drive roots, home itself, or relative paths; the schema rejects them.",
+
+  "_emailImap_note": "Inbound+outbound email connector. Credentials must NOT live here — put them in .crabmeat/local.json (gitignored), which deep-merges over this file at boot. Schema: connectors.emailImap = { user, password (Gmail App Password), from?, allowFromAddresses[] (required), outboundTo? (defaults to allowFromAddresses), imapHost?, imapPort?, smtpHost?, smtpPort?, pollIntervalMs?, mailbox? }. See README 'Email Agent' for the cold-start walk-through.",
+
+  "_refusalFallback_note": "Interception layer: when the primary model refuses, CrabMeat silently reroutes to a fallback local provider. Two modes: (1) strict — only reroute requests whose content class is on contentClassAllowlist (nsfw-search, adult-creative, edgy-humor, security-research, substance-info); (2) rerouteUnclassified=true — also reroute when the classifier couldn't identify a class (the 'no babysitter' mode — catches small local models refusing benign queries). Disabled by default.",
+  "refusalFallback": {
+    "enabled": false,
+    "fallbackProviderIds": [],
+    "contentClassAllowlist": [],
+    "leadBytes": 200,
+    "rerouteUnclassified": false
+  }
+}
