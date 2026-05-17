@@ -1,0 +1,1 @@
+{"version":3,"file":"proposal.d.ts","sourceRoot":"","sources":["../../../src/reconcile/proposal.ts"],"names":[],"mappings":"AAAA,MAAM,WAAW,QAAQ;IACvB,QAAQ,CAAC,IAAI,EAAE,MAAM,CAAC;IACtB,QAAQ,CAAC,IAAI,EAAE,QAAQ,CAAC,MAAM,CAAC,MAAM,EAAE,OAAO,CAAC,CAAC,CAAC;CAClD;AAED,wBAAgB,aAAa,CAAC,IAAI,EAAE,MAAM,GAAG,QAAQ,GAAG,IAAI,CA4B3D"}

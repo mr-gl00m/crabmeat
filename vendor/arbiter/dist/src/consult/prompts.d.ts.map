@@ -1,0 +1,1 @@
+{"version":3,"file":"prompts.d.ts","sourceRoot":"","sources":["../../../src/consult/prompts.ts"],"names":[],"mappings":"AACA,OAAO,KAAK,EAAE,MAAM,EAAgB,MAAM,aAAa,CAAC;AAExD,MAAM,WAAW,gBAAgB;IAC/B,QAAQ,CAAC,MAAM,EAAE,MAAM,CAAC;IACxB,QAAQ,CAAC,IAAI,EAAE,MAAM,CAAC;CACvB;AAsCD,wBAAgB,eAAe,CAAC,MAAM,EAAE,MAAM,GAAG,gBAAgB,CAuChE"}
