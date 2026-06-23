@@ -11,7 +11,70 @@ to match.
 
 ## [Unreleased]
 
-_Nothing yet; first post-release changes land here._
+_Nothing yet._
+
+## [0.2.0] - 2026-06-22
+
+### Highlights
+
+- Two thin-GUI-shell tools: `launch_app` opens a desktop app by
+  natural-language name, `search_files` collapses glob + grep + content search
+  into one ranked query. All the matching intelligence is deterministic; there
+  is no model judgment in the lookup path.
+- `TOOL_CONTRACT_VERSION`: the shell-to-engine tool contract now carries its
+  own semver, so an external shell can pin the contract independent of the
+  package version.
+- The capability boundary is now proven to hold under slow-boil context
+  accumulation. Scripted multi-turn adversarial suites run in CI.
+
+### Added
+
+- `launch_app`: open a desktop app by natural-language name. The lookup is
+  fully deterministic: a `Get-StartApps` registry scan (Win32 + UWP, cached
+  with a TTL and rescanned on a miss), a learned alias store consulted before
+  fuzzy matching, and a confidence gate that returns candidate matches instead
+  of guessing when the name is ambiguous. Aliases are learned only after a
+  successful dispatch. Effect class `exec` (blocked under plan mode),
+  owner-only (an inbound email sender can never pop a window on your desktop),
+  dry-run supported. Windows only for now.
+- `search_files`: unified plain-text file search. One query matches both file
+  names and content, merged and ranked. A facade over the existing glob/grep
+  walk so thin GUI shells stay small and a small local model sees one search
+  tool instead of three. No regex or glob syntax; tokens AND-match within a
+  line for content hits.
+- `TOOL_CONTRACT_VERSION`: the shell-to-engine tool contract (canonical tool
+  ids, parameter schemas, result envelope) now declares its own semver,
+  separate from package versioning. External shells pin against this constant;
+  engine internals can churn without moving it. Additive changes bump its
+  minor, breaking changes bump its major.
+
+### Fixed
+
+- Email connector no longer starts silently dead. When `crabmeat.json`
+  declares email intent (the `_emailImap_note` placeholder) but IMAP
+  credentials don't resolve from a user/local scope (e.g. a workspace refresh
+  dropped the gitignored `.crabmeat/local.json`), the gateway used to skip the
+  connector and look healthy while never touching the mailbox. It now warns
+  loudly at boot, so a dropped credential surfaces immediately instead of days
+  later.
+
+### Security
+
+- Expanded adversarial coverage for the multi-turn / slow-boil attack shape.
+  Two CI suites (`redteam-multiturn-escalation`, `redteam-inference-deny-path`)
+  prove the capability gate's verdict is a pure function of (capability id,
+  agent grant, tool definition): invariant to turn position, immune to context
+  accumulation, with a tamper-evident audit entry per turn. Trust built over
+  benign turns does not unlock a later escalation, and a denial hard-stops the
+  inference loop with no retry. Coverage only; no behavior change.
+
+### Internal
+
+- Tooling + hygiene: a GUI tool-call bench (`crabmeat/tools/`) for qualifying
+  candidate bundled local models (output gitignored to `.bench/`); dropped
+  vendored reference codebases and untracked machine-local config; CRLF pinned
+  for batch/script files; monorepo-root README front-page link and path fixes
+  so a stranger's first copy-paste works.
 
 ## [0.1.0] - 2026-05-18
 
@@ -24,13 +87,13 @@ subsystem rather than chronology.
 - Initial public release of CrabMeat: a security-first agentic gateway where
   dangerous tool classes are off by default, the always-on protections cannot
   be disabled, and the LLM never holds the security boundary.
-- Ships as a single portable `CrabMeat.exe` — a PySide6 setup wizard and
+- Ships as a single portable `CrabMeat.exe`: a PySide6 setup wizard and
   dashboard that installs and runs CrabMeat with no preinstalled Node or Python.
 - Bidirectional email agent: drive CrabMeat from your inbox with
   markdown-rendered replies, thread preservation, forward / CC / reply
   handling, and outbound attachments.
 
-### Added — gateway
+### Added: gateway
 
 - WebSocket gateway with timing-safe token auth, origin check, RFC 6455
   handshake validation, and frame size caps (64 KB pre-auth, 1 MB post-auth).
@@ -40,26 +103,26 @@ subsystem rather than chronology.
 - Cron + webhook scheduler with per-route secret validation and a persistent
   schedule store.
 
-### Added — inference + providers
+### Added: inference + providers
 
 - Multi-provider streaming: Anthropic, OpenAI, and any OpenAI-compatible
   endpoint (Ollama, LM Studio, vLLM) with an ordered failover chain that
   distinguishes model-level from provider-level errors.
 - Routing:
-  - **Arbiter intent gate** — the intent classifier that sits ahead of
+  - **Arbiter intent gate**: the intent classifier that sits ahead of
     the persona-bearing context window. Verdicts enter the
     audit chain alongside tool calls.
-  - **Layer 2** — local-model disambiguation for medium-confidence queries.
+  - **Layer 2**: local-model disambiguation for medium-confidence queries.
     Streaming lead-buffered escalation detection prevents the user from
     seeing a hedge token before Layer 3 takes over. Opt-in. No tool access.
-  - **Layer 3** — full provider with tool calling, refusal interception,
+  - **Layer 3**: full provider with tool calling, refusal interception,
     and content-class-gated reroute to a local fallback.
 - Context compaction with a deterministic metadata header (code-generated,
   tamper-evident) plus an LLM summary body. Compaction-start and
   compaction-fallthrough diagnostic events fire so a UI can surface the
   pause without log-grepping.
 
-### Added — tools
+### Added: tools
 
 - 30+ built-in tools across read / write / exec / network / none effect
   classes. Highlights: `file_read` / `file_write` / `file_edit` /
@@ -87,7 +150,7 @@ subsystem rather than chronology.
   non-owner callers, and validate-time gates reject any cap-ID that resolved
   despite a non-owner role.
 
-### Added — security primitives
+### Added: security primitives
 
 - Tamper-evident SHA-256 hash-chained audit log with optional disk
   persistence (atomic rename) and `verify()`. Privileged operations
@@ -117,7 +180,7 @@ subsystem rather than chronology.
 - Kill tokens: every outbound message to an external channel embeds a
   single-use 1-hour kill URL.
 
-### Added — connectors
+### Added: connectors
 
 - IMAP + SMTP email connector with bidirectional flow, markdown rendering
   (multipart/alternative with strict sanitize-html allowlist), per-thread
@@ -130,7 +193,7 @@ subsystem rather than chronology.
   surfaced into agent context, kill-token embedding on every external
   send, and per-connector retry semantics.
 
-### Added — agent identity + memory
+### Added: agent identity + memory
 
 - Soulshard system: declarative identity in portable `.shard` ZIP files
   (manifest with checksums, `soulshard.json`, `mindshard.json`,
@@ -141,7 +204,7 @@ subsystem rather than chronology.
 - Memory layer with cortex tiers (STM / LTM / Core), cortexdream
   consolidation, and atomic memdir shard writers.
 
-### Added — observability
+### Added: observability
 
 - OTEL diagnostics boundary with a typed event contract (`tool.execution.*`,
   `model.call.*`, `context.assembled`, `message.delivery.*`,
@@ -156,7 +219,7 @@ subsystem rather than chronology.
   connectivity, Layer 2 health, session sizes, schedule validity, disk
   usage.
 
-### Added — operator surface
+### Added: operator surface
 
 - First-run setup wizard (`crabmeat setup`) guiding provider, local-model,
   and auth configuration.
@@ -173,7 +236,7 @@ subsystem rather than chronology.
 - `GET /greenlight` HTTP route (auth-gated when admin auth is configured)
   exposing the same composite check for external monitoring.
 
-### Added — launcher
+### Added: launcher
 
 - Single-file `CrabMeat.exe` launcher (PySide6): a setup wizard on first run,
   an operations dashboard on every run after. End users need no preinstalled
@@ -181,7 +244,7 @@ subsystem rather than chronology.
 - Setup wizard: install-folder validation (ASCII path, rejects network shares
   and OneDrive), AI-provider selection (Anthropic, OpenAI, DeepSeek, or a local
   model via Ollama), optional Gmail connection (address + App Password) for the
-  email channel, and automated provisioning — copies the CrabMeat source,
+  email channel, and automated provisioning: copies the CrabMeat source,
   downloads a Node 22 runtime, generates `.env` / `crabmeat.json` /
   `.crabmeat/local.json`, runs `npm install`, and builds. The local-model path
   also installs Ollama and pulls the chosen model.
@@ -203,8 +266,9 @@ subsystem rather than chronology.
 - Setup wizard secret prompt detects TTY availability before raw-mode
   masking; falls through to a visible-input warning when raw mode is
   unavailable rather than echoing the secret silently.
-- Retry backoff carries 10–25% random jitter to prevent synchronized retry
+- Retry backoff carries 10-25% random jitter to prevent synchronized retry
   storms when many clients hit the same provider rate limit.
 
-[Unreleased]: https://github.com/mr-gl00m/crabmeat/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/mr-gl00m/crabmeat/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/mr-gl00m/crabmeat/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/mr-gl00m/crabmeat/releases/tag/v0.1.0

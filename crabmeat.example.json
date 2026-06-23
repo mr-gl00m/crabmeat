@@ -33,6 +33,18 @@
     }
   ],
 
+  "_providers_local_llamacpp_alternate_note": "llama.cpp's bundled server (llama-server) speaks the OpenAI API, so it uses type 'openai' — no dedicated provider needed. Context size is set when the server is launched (-c flag), not per-request, so the Ollama num_ctx pitfall does not apply. Embedding shells (e.g. PolyGlot) launch llama-server themselves and point a provider here.",
+  "_providers_local_llamacpp_alternate": [
+    {
+      "id": "llamacpp-local",
+      "type": "openai",
+      "apiKey": "llamacpp",
+      "baseUrl": "http://127.0.0.1:8080/v1",
+      "model": "qwen3-4b-instruct",
+      "timeoutMs": 180000
+    }
+  ],
+
   "_tools_note": "The agent can only call tools listed here AND in the agent's 'tools' array. This catalog mirrors CrabMeat's built-in tool handlers; trim it if you want a narrower agent.",
   "tools": [
     {
@@ -127,6 +139,28 @@
         "ignore_case": { "type": "boolean", "description": "Case-insensitive matching.", "required": false, "default": false },
         "files_only": { "type": "boolean", "description": "Return only matching file paths instead of lines.", "required": false, "default": false },
         "max_results": { "type": "number", "description": "Maximum matches to return.", "required": false, "default": 200 }
+      }
+    },
+    {
+      "id": "search_files",
+      "name": "search_files",
+      "description": "Find files by name or content with one plain-text query. No regex or glob syntax — query tokens are matched against file names and content lines, results merged and ranked.",
+      "effectClass": "read",
+      "parameters": {
+        "query": { "type": "string", "description": "Plain-text search query (words, not regex).", "required": true },
+        "path": { "type": "string", "description": "Base directory to search from.", "required": false, "default": "." },
+        "max_results": { "type": "number", "description": "Maximum ranked results to return (1-50).", "required": false, "default": 50 }
+      }
+    },
+    {
+      "id": "launch_app",
+      "name": "launch_app",
+      "description": "Open an installed desktop application by name. Resolution is deterministic (learned aliases, then registry match with a confidence gate); ambiguous names return candidates instead of launching. Owner-only.",
+      "effectClass": "exec",
+      "parameters": {
+        "name": { "type": "string", "description": "App name or the user's phrasing for it.", "required": true },
+        "alias": { "type": "string", "description": "Original user phrasing to remember for this app after a successful launch.", "required": false },
+        "dry_run": { "type": "boolean", "description": "Resolve and report what would launch without launching.", "required": false, "default": false }
       }
     },
     {
@@ -277,6 +311,20 @@
       "tools": ["file_read", "file_write", "file_edit", "file_list", "file_move", "file_copy", "glob_search", "grep_search", "web_search", "web_fetch", "weather", "pdf_extract", "timer", "random", "memory_read", "memory_write", "todo_write", "ask_user", "plan_mode", "shell"],
       "allowedEffects": ["read", "write", "network", "exec"],
       "maxToolIterations": 20
+    }
+  ],
+
+  "_agents_gui_shell_alternate_note": "Minimal tool surface for thin GUI shells driven by small local models (1.7B-4B class). Translating short utterances into one of ~5 tools is a fair fight for those models; the full catalog above is not. Pair with a local provider and keep the catalog this small.",
+  "_agents_gui_shell_alternate": [
+    {
+      "id": "gui",
+      "name": "Desktop Assistant",
+      "systemPrompt": "You are a friendly desktop assistant. Translate what the user asks into one tool call. If a tool result asks you to clarify with the user, relay that question in plain language and wait. Never invent capabilities you don't have.",
+      "temperature": 0.3,
+      "maxTokens": 1024,
+      "tools": ["search_files", "launch_app", "file_list", "ask_user", "memory_read", "memory_write"],
+      "allowedEffects": ["read", "write", "exec"],
+      "maxToolIterations": 5
     }
   ],
 
