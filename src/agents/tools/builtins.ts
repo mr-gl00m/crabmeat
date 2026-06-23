@@ -28,6 +28,7 @@ import { registerSubagentSpawnTool } from "./subagent-spawn.js";
 import { registerPlanModeTool } from "./plan-mode.js";
 import { registerEmailAttachTool } from "./email-attach.js";
 import { registerPdfExtractTool } from "./pdf-extract.js";
+import { registerLaunchAppTool } from "./launch-app.js";
 import {
   askQuestion as askUserQuestion,
   DEFAULT_ASK_TIMEOUT_MS,
@@ -2083,6 +2084,241 @@ async function handleGrepSearch(
   };
 }
 
+// ── search_files ──────────────────────────────────────────
+//
+// Unified front-door search: one plain-text query matched against BOTH
+// file names and file contents, merged and ranked. This is a facade for
+// thin shells (GUI front-ends) so the shell stays dumb and small local
+// models only need one search tool in their catalog. glob_search and
+// grep_search remain the precision instruments; this tool trades their
+// expressiveness (regex, globs) for forgiving plain-text semantics:
+// the query is split into tokens, a file name scores by token overlap,
+// and a content line matches only when every token appears in it.
+
+const MAX_SEARCH_RESULTS = 50;
+const MAX_SEARCH_SCAN_FILES = 5000;
+const SEARCH_PREVIEW_LEN = 200;
+
+const SCORE_NAME_EXACT = 100;
+const SCORE_NAME_SUBSTRING = 60;
+const SCORE_PATH_SUBSTRING = 40;
+const SCORE_NAME_TOKEN = 10;
+const SCORE_CONTENT_BASE = 30;
+const SCORE_CONTENT_PER_LINE = 2;
+const SCORE_CONTENT_LINE_CAP = 5;
+
+function escapeForRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+interface SearchFileHit {
+  path: string;
+  score: number;
+  nameMatch: boolean;
+  contentLines: number;
+  line?: number;
+  preview?: string;
+}
+
+async function handleSearchFiles(
+  params: Record<string, unknown>,
+): Promise<BuiltinResult> {
+  const query = ((params.query as string | undefined) ?? "").trim();
+  const searchPath = (params.path as string | undefined) ?? ".";
+  const maxResults = Math.min(
+    Math.max((params.max_results as number | undefined) ?? MAX_SEARCH_RESULTS, 1),
+    MAX_SEARCH_RESULTS,
+  );
+
+  if (!query) {
+    return { content: "query is required.", isError: true };
+  }
+
+  const base = await jailPathReal(searchPath);
+  if (!base) {
+    return { content: `Access denied: path '${searchPath}' is outside the workspace.`, isError: true };
+  }
+
+  const queryLower = query.toLowerCase();
+  const tokens = queryLower.split(/\s+/).filter((t) => t.length > 0);
+  const tokenRegexes = tokens.map((t) => new RegExp(escapeForRegex(t), "i"));
+
+  const hits = new Map<string, SearchFileHit>();
+  let filesWalked = 0;
+  let scanTruncated = false;
+
+  const scoreName = (fullPath: string): number => {
+    const name = basename(fullPath).toLowerCase();
+    const stem = name.replace(/\.[^.]+$/, "");
+    const relPath = relative(base, fullPath).replace(/\\/g, "/").toLowerCase();
+
+    if (stem === queryLower || name === queryLower) return SCORE_NAME_EXACT;
+    if (name.includes(queryLower)) return SCORE_NAME_SUBSTRING;
+    if (relPath.includes(queryLower)) return SCORE_PATH_SUBSTRING;
+    let score = 0;
+    for (const token of tokens) {
+      if (name.includes(token)) score += SCORE_NAME_TOKEN;
+    }
+    return score;
+  };
+
+  /** A line matches when EVERY query token appears in it. */
+  const scanContent = async (
+    fullPath: string,
+  ): Promise<{ count: number; line?: number; preview?: string }> => {
+    try {
+      const st = await stat(fullPath);
+      if (st.size > MAX_GREP_FILE_BYTES) return { count: 0 };
+      const raw = await readFile(fullPath, "utf-8");
+      const lines = raw.split("\n");
+      let count = 0;
+      let firstLine: number | undefined;
+      let preview: string | undefined;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i] ?? "";
+        if (!tokenRegexes.every((re) => re.test(line))) continue;
+        count++;
+        if (firstLine === undefined) {
+          firstLine = i + 1;
+          const trimmed = line.trim();
+          preview = trimmed.length > SEARCH_PREVIEW_LEN
+            ? trimmed.slice(0, SEARCH_PREVIEW_LEN) + "…"
+            : trimmed;
+        }
+      }
+      return { count, line: firstLine, preview };
+    } catch {
+      return { count: 0 }; // unreadable file — name score may still apply
+    }
+  };
+
+  const walk = async (dir: string): Promise<void> => {
+    if (filesWalked >= MAX_SEARCH_SCAN_FILES) {
+      scanTruncated = true;
+      return;
+    }
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (filesWalked >= MAX_SEARCH_SCAN_FILES) {
+        scanTruncated = true;
+        return;
+      }
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (
+          entry.name === "node_modules" ||
+          entry.name === ".git" ||
+          entry.name === "dist" ||
+          entry.name.startsWith(".")
+        ) {
+          continue;
+        }
+        await walk(fullPath);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      filesWalked++;
+
+      const nameScore = scoreName(fullPath);
+      let contentResult: { count: number; line?: number; preview?: string } = { count: 0 };
+      if (!isBinaryExtension(fullPath)) {
+        contentResult = await scanContent(fullPath);
+      }
+      const contentScore = contentResult.count > 0
+        ? SCORE_CONTENT_BASE +
+          Math.min(contentResult.count, SCORE_CONTENT_LINE_CAP) * SCORE_CONTENT_PER_LINE
+        : 0;
+      const total = nameScore + contentScore;
+      if (total <= 0) continue;
+
+      hits.set(fullPath, {
+        path: relative(workspaceRoot, fullPath).replace(/\\/g, "/"),
+        score: total,
+        nameMatch: nameScore > 0,
+        contentLines: contentResult.count,
+        line: contentResult.line,
+        preview: contentResult.preview,
+      });
+    }
+  };
+
+  try {
+    const baseStat = await stat(base);
+    if (baseStat.isFile()) {
+      filesWalked = 1;
+      const nameScore = scoreName(base);
+      const contentResult = isBinaryExtension(base) ? { count: 0 } : await scanContent(base);
+      const contentScore = contentResult.count > 0
+        ? SCORE_CONTENT_BASE +
+          Math.min(contentResult.count, SCORE_CONTENT_LINE_CAP) * SCORE_CONTENT_PER_LINE
+        : 0;
+      if (nameScore + contentScore > 0) {
+        hits.set(base, {
+          path: relative(workspaceRoot, base).replace(/\\/g, "/"),
+          score: nameScore + contentScore,
+          nameMatch: nameScore > 0,
+          contentLines: contentResult.count,
+          ...(contentResult.count > 0
+            ? { line: contentResult.line, preview: contentResult.preview }
+            : {}),
+        });
+      }
+    } else {
+      await walk(base);
+    }
+  } catch (err: unknown) {
+    const msg = formatErrorMessage(err);
+    return { content: `Search error: ${msg}`, isError: true };
+  }
+
+  const ranked = [...hits.values()]
+    .sort((a, b) => b.score - a.score || a.path.localeCompare(b.path));
+  const shown = ranked.slice(0, maxResults);
+  const resultsTruncated = ranked.length > maxResults;
+
+  if (shown.length === 0) {
+    const scanNote = scanTruncated
+      ? ` Scan stopped at ${MAX_SEARCH_SCAN_FILES} files — narrow the path to cover the rest.`
+      : "";
+    return {
+      content: `No files matched '${query}' (scanned ${filesWalked} file(s)).${scanNote}`,
+      outputs: { results: [], count: 0, truncated: scanTruncated },
+    };
+  }
+
+  const lines = shown.map((h) => {
+    const kind = h.nameMatch && h.contentLines > 0
+      ? "name+content"
+      : h.nameMatch
+        ? "name"
+        : "content";
+    const where = h.contentLines > 0 ? `:${h.line}` : "";
+    const previewPart = h.preview ? ` — ${h.preview}` : "";
+    const moreLines = h.contentLines > 1 ? ` (+${h.contentLines - 1} more lines)` : "";
+    return `${h.path}${where} [${kind}]${previewPart}${moreLines}`;
+  });
+  const suffixes: string[] = [];
+  if (resultsTruncated) suffixes.push(`… showing top ${maxResults} of ${ranked.length}`);
+  if (scanTruncated) {
+    suffixes.push(`scan stopped at ${MAX_SEARCH_SCAN_FILES} files — narrow the path to cover the rest`);
+  }
+  const suffix = suffixes.length > 0 ? `\n(${suffixes.join("; ")})` : "";
+
+  return {
+    content: `${shown.length} result(s) for '${query}':\n${lines.join("\n")}${suffix}`,
+    outputs: {
+      results: shown,
+      count: shown.length,
+      truncated: resultsTruncated || scanTruncated,
+    },
+  };
+}
+
 // ── file_list ─────────────────────────────────────────────
 
 function formatBytes(bytes: number): string {
@@ -3085,6 +3321,7 @@ export function registerBuiltinTools(config?: {
   registerToolHandler("file_list", handleFileList);
   registerToolHandler("glob_search", handleGlobSearch);
   registerToolHandler("grep_search", handleGrepSearch);
+  registerToolHandler("search_files", handleSearchFiles);
   registerToolHandler("shell", handleShell);
   registerToolHandler("web_fetch", handleWebFetch);
   registerToolHandler("weather", handleWeather);
@@ -3125,6 +3362,10 @@ export function registerBuiltinTools(config?: {
 
   // PDF extraction (read — pdfjs-dist, text + normalization passes)
   registerPdfExtractTool();
+
+  // Desktop app launching (owner-only, exec class — registry scan +
+  // learned aliases + confidence gate; pre-Phase-11 carve)
+  registerLaunchAppTool();
 
   // Batch file ops (ported from Cid's Python tools)
   registerToolHandler("rename_files_dirty", handleRenameFilesDirty);
@@ -3211,7 +3452,7 @@ export function registerBuiltinTools(config?: {
 
   logger.info(
     {
-      tools: ["file_read", "file_write", "file_edit", "file_move", "file_copy", "file_list", "glob_search", "grep_search", "shell", "web_fetch", "weather", "pdf_extract", "web_search", "memory_write", "memory_read", "timer", "random", "ask_user", "todo_write", "message_send", "subagent_spawn", "plan_mode", "email_attach", "email_attach_content", "rename_files_dirty", "flatten_folder", "clean_junk_files", "rename_episodes", "rename_rom_files"],
+      tools: ["file_read", "file_write", "file_edit", "file_move", "file_copy", "file_list", "glob_search", "grep_search", "search_files", "shell", "web_fetch", "weather", "pdf_extract", "web_search", "memory_write", "memory_read", "timer", "random", "ask_user", "todo_write", "message_send", "subagent_spawn", "plan_mode", "email_attach", "email_attach_content", "rename_files_dirty", "flatten_folder", "clean_junk_files", "rename_episodes", "rename_rom_files"],
       extraAllowedPaths,
     },
     "Built-in tool handlers registered",

@@ -18,6 +18,17 @@ import type {
   ToolOutputDef,
 } from "./types.js";
 
+/**
+ * Semver of the shell↔engine tool contract: the set of canonical tool ids,
+ * their parameter schemas, and the result envelope ({ content, isError,
+ * outputs }). External shells (PolyGlot, future GUIs) pin against THIS
+ * version, not the package version — engine internals can change freely
+ * without touching it. Bump minor for additive changes (new tools, new
+ * optional params), major for anything that renames, removes, or changes
+ * the meaning of an existing tool or parameter.
+ */
+export const TOOL_CONTRACT_VERSION = "1.0.0";
+
 export interface ToolCatalog {
   /** Get a tool definition by ID. */
   get(toolId: string): ToolDefinition | undefined;

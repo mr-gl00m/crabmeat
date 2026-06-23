@@ -227,6 +227,8 @@ const TOOL_CAPABILITY_DESCRIPTIONS: Record<string, string> = {
   file_copy: "copy files in the workspace",
   file_list: "list directory contents",
   glob_search: "search for files by pattern",
+  search_files: "find files by name or content with one plain-text query (no regex/glob syntax needed)",
+  launch_app: "open a desktop application by name (learned phrasings resolve instantly; ambiguous names come back as a question to relay to the user)",
   shell: "execute shell commands",
   web_fetch: "fetch data from URLs",
   memory_write: "persist notes to long-term memory",
