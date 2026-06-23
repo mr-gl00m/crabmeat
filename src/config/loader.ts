@@ -318,6 +318,25 @@ async function loadCascade(): Promise<Config> {
     { scopes: layers.map((l) => l.scope) },
     "Config cascade loaded and validated",
   );
+
+  // Email-intent guard. crabmeat.json ships a top-level `_emailImap_note`
+  // placeholder signalling the operator means to run the email connector,
+  // but the credentials must arrive from a user or local scope
+  // (~/.crabmeat/config.json or .crabmeat/local.json). If that scope is
+  // missing — e.g. a workspace refresh drops the gitignored local.json —
+  // connectors.emailImap silently resolves to undefined, the gateway skips
+  // starting the connector, and the box looks healthy while never touching
+  // the mailbox. (This exact gap went unnoticed for ~6 days: 2026-05-22.)
+  // Warn loudly at boot so it's visible immediately, not days later.
+  const emailIntentDeclared =
+    typeof (merged as Record<string, unknown>)["_emailImap_note"] === "string";
+  if (emailIntentDeclared && !result.data.connectors.emailImap) {
+    logger.warn(
+      { scopesLoaded: layers.map((l) => l.scope), expectedLocal: localPath, expectedUser: userPath },
+      "email-imap: crabmeat.json declares email intent (_emailImap_note) but no connectors.emailImap credentials resolved from any scope — the email connector will NOT start and no mail will be polled. Create .crabmeat/local.json (or run `crabmeat setup`) with user/password/allowFromAddresses.",
+    );
+  }
+
   return result.data;
 }
 
