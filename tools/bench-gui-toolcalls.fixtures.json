@@ -1,0 +1,25 @@
+{
+  "_note": "Grandma-class utterances for the GUI shell tool surface. expectTool is a string or an array of acceptable tools (first entry is primary; expectArgs only checked when the primary is chosen). Substrings in expectArgs must appear in the JSON-encoded arguments (case-insensitive). 'none' means the correct behavior is answering in text without any tool call.",
+  "fixtures": [
+    { "id": "launch-plain", "utterance": "open google chrome", "expectTool": "launch_app", "expectArgs": ["chrome"] },
+    { "id": "launch-grandma", "utterance": "I don't know how to bring up the googles", "expectTool": "launch_app" },
+    { "id": "launch-calc", "utterance": "can you open the calculator for me", "expectTool": "launch_app", "expectArgs": ["calc"] },
+    { "id": "launch-notepad", "utterance": "I want to write a note, open something for that", "expectTool": ["launch_app", "ask_user"] },
+    { "id": "launch-polite", "utterance": "would you please start up Steam", "expectTool": "launch_app", "expectArgs": ["steam"] },
+    { "id": "search-photos", "utterance": "where are my vacation photos", "expectTool": "search_files", "expectArgs": ["vacation"] },
+    { "id": "search-tax", "utterance": "find that tax letter from last year", "expectTool": "search_files", "expectArgs": ["tax"] },
+    { "id": "search-recipe", "utterance": "I saved a recipe for chocolate cake somewhere, find it", "expectTool": "search_files", "expectArgs": ["chocolate"] },
+    { "id": "search-resume", "utterance": "look for my resume", "expectTool": "search_files", "expectArgs": ["resume"] },
+    { "id": "search-doc-content", "utterance": "which file mentions the plumber's phone number", "expectTool": "search_files", "expectArgs": ["plumber"] },
+    { "id": "list-downloads", "utterance": "what's in my downloads folder", "expectTool": "file_list", "expectArgs": ["download"] },
+    { "id": "list-here", "utterance": "show me the files in this folder", "expectTool": "file_list" },
+    { "id": "memory-write-name", "utterance": "remember that my granddaughter's birthday is June 3rd", "expectTool": "memory_write", "expectArgs": ["june 3"] },
+    { "id": "memory-write-pref", "utterance": "remember I like the text big", "expectTool": "memory_write" },
+    { "id": "memory-read-birthday", "utterance": "when did I say my granddaughter's birthday was?", "expectTool": "memory_read" },
+    { "id": "ask-vague", "utterance": "open the thing", "expectTool": "ask_user" },
+    { "id": "none-greeting", "utterance": "good morning!", "expectTool": "none" },
+    { "id": "none-smalltalk", "utterance": "thank you, you're very helpful", "expectTool": "none" },
+    { "id": "launch-typo", "utterance": "opne crome", "expectTool": "launch_app" },
+    { "id": "search-then-noise", "utterance": "ugh I can never find anything... find my insurance card scan", "expectTool": "search_files", "expectArgs": ["insurance"] }
+  ]
+}
