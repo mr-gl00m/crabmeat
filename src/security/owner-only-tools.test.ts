@@ -10,11 +10,15 @@ import {
 
 describe("owner-only tool routing", () => {
   describe("OWNER_ONLY_TOOL_NAMES", () => {
-    it("ships empty by default — no current crabmeat tool qualifies", () => {
-      expect(OWNER_ONLY_TOOL_NAMES).toEqual([]);
+    it("contains exactly the desktop-action tools", () => {
+      expect(OWNER_ONLY_TOOL_NAMES).toEqual(["launch_app"]);
     });
 
-    it("isOwnerOnlyToolName returns false for any current tool", () => {
+    it("isOwnerOnlyToolName returns true for launch_app", () => {
+      expect(isOwnerOnlyToolName("launch_app")).toBe(true);
+    });
+
+    it("isOwnerOnlyToolName returns false for every other current tool", () => {
       const sample = [
         "file_read",
         "file_write",
@@ -23,6 +27,7 @@ describe("owner-only tool routing", () => {
         "memory_write",
         "schedule_task",
         "subagent_spawn",
+        "search_files",
       ];
       for (const name of sample) {
         expect(isOwnerOnlyToolName(name)).toBe(false);

@@ -11,16 +11,20 @@ export type CallerRole = "owner" | "shell" | "external";
 
 /**
  * Tools that mutate config, restart the gateway, or otherwise need owner
- * trust. Currently empty: crabmeat ships no config-mutating or restart
- * tool yet. The registry exists so:
+ * trust. The registry exists so:
  *  - Future tools can opt in by adding their canonical id here.
  *  - Hermes ("shell") and webhook ("external") roles arriving in later
  *    phases land into a routing pattern that's already wired and tested.
  *
  * The check is on the canonical tool id (the `name`/`id` field on
  * ToolDefinition), not the per-session capability id.
+ *
+ * launch_app: opens arbitrary installed desktop applications on the
+ * operator's machine. An inbound email sender (even an allowlisted one
+ * acting under a spoofed/compromised account) must never be able to pop
+ * windows on the desktop. Only the person at the keyboard gets this.
  */
-export const OWNER_ONLY_TOOL_NAMES = [] as const satisfies readonly string[];
+export const OWNER_ONLY_TOOL_NAMES = ["launch_app"] as const satisfies readonly string[];
 
 const OWNER_ONLY_TOOL_NAME_SET: ReadonlySet<string> = new Set(OWNER_ONLY_TOOL_NAMES);
 
