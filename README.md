@@ -3,7 +3,7 @@
 > An original, security-first agentic framework. Dangerous things off by default; the LLM never holds the security boundary.
 
 <p align="center">
-  <img src="crabmeat_header.png" alt="CRABMEAT" width="1500"/>
+  <img src="crabmeat/crabmeat_header.png" alt="CRABMEAT" width="1500"/>
 
 CrabMeat is an original, security-first agentic framework: a minimal WebSocket
 gateway that routes client messages to AI providers (OpenAI, Anthropic, and any
@@ -32,9 +32,9 @@ Everything else is feature work on top of that loop.
 covered by tests. The external **Arbiter intent gate** sits ahead of the persona-bearing
 context window. Layer 2 (local-model disambiguation) is opt-in. Multi-evaluator consensus,
 skills, scheduler, and a few other subsystems exist in the internal tree and will land
-in this repo incrementally as each one is hardened. See [ROADMAP.md](ROADMAP.md).
+in this repo incrementally as each one is hardened. See [ROADMAP.md](crabmeat/ROADMAP.md).
 
-If you want a tool added, **open an issue**; see [CONTRIBUTING.md](CONTRIBUTING.md).
+If you want a tool added, **open an issue**; see [CONTRIBUTING.md](crabmeat/CONTRIBUTING.md).
 
 ### Stability tiers
 
@@ -85,7 +85,7 @@ always on, and the LLM never controls the security boundary.**
 ## What's in this repo
 
 <p align="center">
-  <img src="crabmeat_core_loop.png" alt="CRABMEAT" width="1500"/>
+  <img src="crabmeat/crabmeat_core_loop.png" alt="CRABMEAT" width="1500"/>
 
 ### The core loop
 - WebSocket gateway with origin check, frame size caps, and timing-safe auth
@@ -119,7 +119,7 @@ tool call is written to a tamper-evident SHA-256 hash-chained audit log.
 ---
 
 <p align="center">
-  <img src="crabmeat_chaincheck.png" alt="CRABMEAT" width="1500"/>
+  <img src="crabmeat/crabmeat_chaincheck.png" alt="CRABMEAT" width="1500"/>
 
 ## Security (always-on, cannot be disabled)
 
@@ -161,8 +161,11 @@ See the full list in `crabmeat.example.json`.
 ## Quick Start
 
 ```bash
-# 1. Install dependencies
+# 1. Install dependencies (npm workspace; run from the repo root)
 npm install
+
+# The gateway lives in crabmeat/; run the remaining steps from there.
+cd crabmeat
 
 # 2. Configure secrets: copy .env.example, then edit .env to set
 #    CRABMEAT_TOKEN (32+ chars) and your provider API key.
@@ -188,7 +191,7 @@ Connect via WebSocket to `ws://127.0.0.1:3000` and authenticate with the token f
 
 ### Launching on Linux / WSL
 
-No `start.bat` on *nix. Open two terminals:
+No `start.bat` on *nix. From `crabmeat/`, open two terminals:
 
 ```bash
 # Terminal 1 — gateway
@@ -266,6 +269,7 @@ these configured roots.
 ## Development
 
 ```bash
+# from crabmeat/
 npm run typecheck
 npm test
 npm run build
@@ -279,9 +283,9 @@ Bug reports, security reports, and tool requests are all welcome.
 
 - **Found a bug or security issue?** Open an issue. For anything sensitive, please mark
   it as a security report in the issue template.
-- **Want a tool added?** See [CONTRIBUTING.md](CONTRIBUTING.md) for the request template
+- **Want a tool added?** See [CONTRIBUTING.md](crabmeat/CONTRIBUTING.md) for the request template
   and the effect-class rules.
-- **Want to know what's planned?** See [ROADMAP.md](ROADMAP.md).
+- **Want to know what's planned?** See [ROADMAP.md](crabmeat/ROADMAP.md).
 
 ---
 
@@ -292,7 +296,7 @@ Bug reports, security reports, and tool requests are all welcome.
 **CrabMeat™** and the CrabMeat butter-claw logo are trademarks of Nathan Seals.
 They are *not* covered by the Apache 2.0 license. Forks are welcome; please use
 a different name and logo for derivative projects. See
-[TRADEMARK.md](../TRADEMARK.md).
+[TRADEMARK.md](TRADEMARK.md).
 
 ## Support Me
 If you find this useful, consider supporting me and my research:
@@ -308,6 +312,6 @@ If you find this useful, consider supporting me and my research:
 ---
 
 <p align="center">
-  <img src="crabmeat_wallpaper.png" alt="CRABMEAT" width="1500"/>
+  <img src="crabmeat/crabmeat_wallpaper.png" alt="CRABMEAT" width="1500"/>
 
 ---
